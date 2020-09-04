@@ -409,8 +409,6 @@ void ICACHE_RAM_ATTR ProcessRFPacket()
     LastValidPacketMicros = beginProcessing;
     LastValidPacket = millis();
 
-    getRFlinkInfo();
-
     switch (type)
     {
     case RC_DATA_PACKET: //Standard RC Data Packet
@@ -505,7 +503,7 @@ void ICACHE_RAM_ATTR ProcessRFPacket()
         Radio.SetPPMoffsetReg(FreqCorrection);         //as above but corrects a different PPM offset based on freq error
         #endif
     }
-    
+    getRFlinkInfo();
     doneProcessing = micros();
 
 #ifndef DEBUG_SUPPRESS
