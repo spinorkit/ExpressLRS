@@ -264,6 +264,7 @@ void ICACHE_RAM_ATTR HWtimerCallbackTick() // this is 180 out of phase with the 
     alreadyFHSS = false;
     uplinkLQ = LQCALC.getLQ();
     LQCALC.inc();
+    crsf.RXhandleUARTout();
 }
 
 void ICACHE_RAM_ATTR HWtimerCallbackTock()
@@ -750,7 +751,7 @@ void loop()
         GotConnection();
     }
 
-    if (millis() > (SendLinkStatstoFCintervalLastSent + SEND_LINK_STATS_TO_FC_INTERVAL))
+    if (millis() > (SendLinkStatstoFCintervalLastSent + 50))
     {
         if (connectionState == disconnected)
         {
