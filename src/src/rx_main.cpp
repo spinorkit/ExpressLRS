@@ -751,7 +751,7 @@ void loop()
         GotConnection();
     }
 
-    if (millis() > (SendLinkStatstoFCintervalLastSent + 50))
+    if (millis() > (SendLinkStatstoFCintervalLastSent + SEND_LINK_STATS_TO_FC_INTERVAL))
     {
         if (connectionState == disconnected)
         {
