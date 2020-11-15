@@ -138,11 +138,13 @@ checkForPackets:
    return
 
 nextParameter:
-   if selectedParam < kNumEditParams then selectedParam += 1 
+   selectedParam += 1
+   if selectedParam >= kNumEditParams then selectedParam = 0 
 return
 
 previousParameter:
-   if selectedParam > 0 then selectedParam -= 1
+   selectedParam -= 1
+   if selectedParam < 0 then selectedParam = kNumEditParams - 1
 return
 
 decrementParameter:
