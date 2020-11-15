@@ -1,12 +1,15 @@
+rem -- Note: ErskyTx uses 400000 baud to talk to crossfire modules, and therefore ELRS.
+rem -- If you have a 2018 R9M module (with the ACCST logo on the back), you need the 
+rem -- resistor mod for reliable communuication:
+rem -- https://github.com/AlessandroAU/ExpressLRS/wiki/Inverter-Mod-for-R9M-2018
+
 array byte rxBuf[64]
 array byte transmitBuffer[64]
+rem -- array byte paramNames[96]
 
 
 if init = 0
    init = 1
-
-   responseTimeout = 0
-   waitForResponse = 0
 
    pktsRead = 0
    pktsSent = 0
@@ -16,13 +19,9 @@ if init = 0
 
    PARAMETER_WRITE = 0x2D
 
-
-   PARAMETER_TIMEOUT = 20
-   PARAMETER_REFETCH_TIMEOUT = 300
-   SET_PARAMETER_TIMEOUT = 100
-   SEND_FAIL_TIMEOUT = 10
-
-   kMaxMenuItems = 16
+   rem -- max param name is 11 = 10 + null
+   kMaxParamNameLen = 11
+   rem -- strtoarray(paramNames,"Pkt Rate:\0\0TLM Ratio:\0Power:\0\0\0\0\0RF freq:")
 
    AirRateIdx = 0
    TLMintervalIdx = 8
@@ -30,12 +29,13 @@ if init = 0
    RFfreqIdx = 6
 
    kNumEditParams = 4
+
    selectedParam = 0
 
    isSendIncParam = 0
 
    kStateWaitingForParams = 0
-   kHaveParams = 1
+   kReceivedParams = 1
    state = kWaitingForParams
 
    rem -- purge the crossfire packet fifo
@@ -46,65 +46,37 @@ if init = 0
 
    rem gosub requestDeviceData
 end
-
 goto main
 
 sendPacket:
-    result = crossfiresend(sendCommand, sendLength, transmitBuffer)
-    if result = 1
-        pktsSent += 1
-        responseTimeout = time + sendTimeout
-    else
-        responseTimeout = time + SEND_FAIL_TIMEOUT
-    end
-    return
+   result = crossfiresend(sendCommand, sendLength, transmitBuffer)
+   if result = 1
+      pktsSent += 1
+   end
+   return
 
-   sendPingPacket:
+sendPingPacket:
    rem -- crossfireTelemetryPush(0x2D, {0xEE, 0xEA, 0x00, 0x00}) ping until we get a resp
-   sendCommand = 0x2D
+   sendCommand = PARAMETER_WRITE
    sendLength = 4
    transmitBuffer[0]=0xEE
    transmitBuffer[1]=0xEA
    transmitBuffer[2]=0x00
    transmitBuffer[3]=0x00
-    sendTimeout = PARAMETER_TIMEOUT
-    waitForResponse = 1
 
    gosub sendPacket
    return
 
-   sendParamIncDecPacket:
-   sendCommand = 0x2D
+sendParamIncDecPacket:
+   sendCommand = PARAMETER_WRITE
    sendLength = 4
    transmitBuffer[0]=0xEE
    transmitBuffer[1]=0xEA
    transmitBuffer[2]=selectedParam+1
    transmitBuffer[3]=isSendIncParam
-    sendTimeout = PARAMETER_TIMEOUT
-    waitForResponse = 1
 
    gosub sendPacket
    return
-
-   return
-
-sendNextPacket:
-    rem -- if we're waiting for a response, retransmit the previous
-    rem -- packet after a timeout
-    if waitForResponse = 1 & responseTimeout > 0
-        if time > responseTimeout
-            gosub sendPacket
-        end
-        return
-    end
-
-    rem -- should we refresh any parameters?
-    rem -- don't bother if we're in the device list page
-
-    rem -- should we refresh devices?
-    rem -- nah.
-
-    return
 
 checkForPackets:
    command = 0
@@ -129,12 +101,11 @@ checkForPackets:
             MaxPowerIdx = rxBuf[4]-1
             RFfreqIdx = rxBuf[5]-1
          end
-         state = kHaveParams
+         state = kReceivedParams
       end
 
       result = crossfirereceive(count, command, rxBuf)
    end
-
    return
 
 nextParameter:
@@ -158,8 +129,8 @@ gosub sendParamIncDecPacket
 return
 
 main:
-    time = gettime()
-    gosub checkForPackets
+   time = gettime()
+   gosub checkForPackets
 
  	if state = kWaitingForParams 
 		rem -- crossfireTelemetryPush(0x2D, {0xEE, 0xEA, 0x00, 0x00}) -- ping until we get a resp
@@ -176,40 +147,39 @@ main:
       gosub incrementParameter
    end
 
-    drawclear()
-    attr = 0
-    xValPos = 60
-    ypos = 0
-    ygap = 10
-    drawtext(0, ypos*ygap, "ELRS Setup", INVERS)
-    if ypos = selectedParam then attr = INVERS
-    ypos += 1
-    drawtext(0, ypos*ygap, "Pkt Rate:")
-    drawtext(xValPos,ypos*ygap,"------\0AUTO  \0 500Hz\0 250Hz\0 200Hz\0 150Hz\0 100Hz\0  50Hz\0  25Hz\0   4Hz"[AirRateIdx*7],attr)
-    attr = 0
-    if ypos = selectedParam then attr = INVERS
-    ypos += 1
-    drawtext(0, ypos*ygap, "TLM Ratio:")
-    drawtext(xValPos,ypos*ygap,"   Off\0 1:128\0  1:64\0  1:32\0  1:16\0   1:8\0   1:4\0   1:2\0------"[TLMintervalIdx*7],attr)
-    attr = 0
-    if ypos = selectedParam then attr = INVERS
-    ypos += 1
-    drawtext(0, ypos*ygap, "Power:")
-    drawtext(xValPos,ypos*ygap,"------ \0  10 mW\0  25 mW\0  50 mW\0 100 mW\0 250 mW\0 500 mW\0    1 W\0    2 W"[MaxPowerIdx*8],attr)
-    attr = 0
-    if ypos = selectedParam then attr = INVERS
-    ypos += 1
-    drawtext(0, ypos*ygap, "RF freq:")
-    drawtext(xValPos,ypos*ygap," 915 AU \0 915 FCC\0 868 EU \0 433 AU \0 433 EU \0 2G4 ISM\0------"[RFfreqIdx*9],attr)
-    ypos += 1
+   drawclear()
+   valueXPos = 60
+   ygap = 10
+   yPos = 0
+   drawtext(0, yPos, "ELRS Setup", INVERS)
+   rem if param = selectedParam then attr = INVERS
 
-    attr = 0
-    drawtext(0,ypos*ygap,"elrsPkts:")
-    drawnumber(xValPos,ypos*ygap,elrsPkts)
+   param = 0
+   yPos = (param+1)*ygap
+   drawtext(0, yPos, "Pkt Rate:")
+   drawtext(valueXPos,yPos,"------\0AUTO  \0 500Hz\0 250Hz\0 200Hz\0 150Hz\0 100Hz\0  50Hz\0  25Hz\0   4Hz"[AirRateIdx*7],(param=selectedParam)*INVERS)
 
+   param += 1
+   yPos = (param+1)*ygap
+   drawtext(0, yPos, "TLM Ratio:")
+   drawtext(valueXPos,yPos,"   Off\0 1:128\0  1:64\0  1:32\0  1:16\0   1:8\0   1:4\0   1:2\0------"[TLMintervalIdx*7],(param=selectedParam)*INVERS)
 
-    rem gosub sendNextPacket
-    stop
+   param += 1
+   yPos = (param+1)*ygap
+   drawtext(0, yPos, "Power:")
+   drawtext(valueXPos,yPos,"------ \0  10 mW\0  25 mW\0  50 mW\0 100 mW\0 250 mW\0 500 mW\0    1 W\0    2 W"[MaxPowerIdx*8],(param=selectedParam)*INVERS)
+
+   param += 1
+   yPos = (param+1)*ygap
+   drawtext(0, yPos, "RF freq:")
+   drawtext(valueXPos,yPos," 915 AU \0 915 FCC\0 868 EU \0 433 AU \0 433 EU \0 2G4 ISM\0------"[RFfreqIdx*9],(param=selectedParam)*INVERS)
+
+   param += 1
+   yPos = (param+1)*ygap
+   drawtext(0,yPos,"elrsPkts:")
+   drawnumber(valueXPos,yPos,elrsPkts)
+
+   stop
 
 exit:
-    finish
+   finish
