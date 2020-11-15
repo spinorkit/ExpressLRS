@@ -1,3 +1,6 @@
+rem -- This script requires ErskTx R223A6 or later. 
+rem -- See https://openrcforums.com/forum/viewtopic.php?f=7&t=4676&sid=25e7416b867f2c94a6382fbff922d082
+
 rem -- Note: ErskyTx uses 400000 baud to talk to crossfire modules, and therefore ELRS.
 rem -- If you have a 2018 R9M module (with the ACCST logo on the back), you need the 
 rem -- resistor mod for reliable communuication:
