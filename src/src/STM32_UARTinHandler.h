@@ -1,7 +1,16 @@
 #include "CRSF.h"
 #include "targets.h"
 
+#if defined(TARGET_R9SLIMPLUS_RX)
+#define CRSF_RX_SERIAL CrsfRxSerial
+HardwareSerial CrsfRxSerial(USART3);
+#else /* !TARGET_R9SLIMPLUS_RX */
+#define CRSF_RX_SERIAL Serial
+#endif /* TARGET_R9SLIMPLUS_RX */
+
 extern CRSF crsf;
+
+extern GENERIC_CRC8 ota_crc;
 
 uint8_t UARTinPacketPtr;
 uint8_t UARTinPacketLen;
@@ -35,10 +44,10 @@ void STM32_RX_UARTprocessPacket()
 
 void STM32_RX_HandleUARTin()
 {
-    while (Serial.available())
+    while (CRSF_RX_SERIAL.available())
     {
         UARTLastDataTime = millis();
-        char inChar = Serial.read();
+        char inChar = CRSF_RX_SERIAL.read();
 
         if ((inChar == CRSF_ADDRESS_CRSF_RECEIVER || inChar == CRSF_SYNC_BYTE) && UARTframeActive == false) // we got sync, reset write pointer
         {
@@ -58,11 +67,10 @@ void STM32_RX_HandleUARTin()
             {
                 UARTinPacketPtr = 0;
                 UARTframeActive = false;
-                while (Serial.available())
+                while (CRSF_RX_SERIAL.available())
                 {
-                    Serial.read();
+                    (void)CRSF_RX_SERIAL.read();
                 }
-                Serial.flush();
             }
         }
 
@@ -76,7 +84,7 @@ void STM32_RX_HandleUARTin()
 
         if (UARTinPacketPtr == UARTinPacketLen + 2) // plus 2 because the packlen is referenced from the start of the 'type' flag, IE there are an extra 2 bytes.
         {
-            char CalculatedCRC = CalcCRC((uint8_t *)UARTinBuffer + 2, UARTinPacketPtr - 3);
+            char CalculatedCRC = ota_crc.calc((uint8_t *)UARTinBuffer + 2, UARTinPacketPtr - 3);
 
             if (CalculatedCRC == inChar)
             {
@@ -102,11 +110,12 @@ void STM32_RX_HandleUARTin()
                 //Serial.println();
                 UARTframeActive = false;
                 UARTinPacketPtr = 0;
-                while (Serial.available())
+                while (CRSF_RX_SERIAL.available())
                 {
-                    Serial.read(); // dunno why but the flush() method wasn't working
+                    // dunno why but the flush() method wasn't working
+                    // A: because flush() waits until all data is SENT aka TX buffer is empty
+                    (void)CRSF_RX_SERIAL.read();
                 }
-                Serial.flush();
             }
         }
     }
