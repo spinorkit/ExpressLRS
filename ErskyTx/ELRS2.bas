@@ -23,7 +23,9 @@ if init = 0
    pktsSent = 0
    pktsGood = 0
    elrsPkts = 0
-   rxBuf2 = 0;
+   kMinCommandInterval = 40
+   lastChangeTime = gettime()
+
 
    PARAMETER_WRITE = 0x2D
 
@@ -50,7 +52,12 @@ if init = 0
    paramMaxs[kMaxPowerParamIdx] = 7
    
 
-   nValidAirRates = 0
+   rem -- 433/868/915 (SX127x)
+   nValidAirRates = 4
+   validAirRates[0] = 6
+   validAirRates[1] = 5
+   validAirRates[2] = 4
+   validAirRates[3] = 2
 
 
    i = 0
@@ -108,8 +115,10 @@ sendPingPacket:
    return
 
 sendParamIncDecPacket:
+   if gettime() - lastChangeTime < kMinCommandInterval then return
 
-   if(selectedParam = kAirRateParamIdx)
+   origValue = params[selectedParam]
+   if selectedParam = kAirRateParamIdx
       rem -- find the index of the current value
       AirRateIdx = params[kAirRateParamIdx]
       i = 0
@@ -117,24 +126,24 @@ sendParamIncDecPacket:
          if validAirRates[i] = AirRateIdx then break
          i += 1
       end
-      if isSendIncParam = 1
-         i += 1
-         if i >= nValidAirRates then i = nValidAirRates-1
-      else
-         if i > 0 then i -= 1
+      i += isSendIncParam
+      if i >= nValidAirRates
+         i = nValidAirRates-1
+      elseif i < 0
+         i = 0
       end
       value = validAirRates[i]
    else
       value = params[selectedParam]
-      if isSendIncParam = 1
-         value += 1
-         if value > paramMaxs[selectedParam] then value = paramMaxs[selectedParam]
-      else
-         value -= 1
-         if value < paramMins[selectedParam] then value = paramMins[selectedParam]
+      value += isSendIncParam
+      if value > paramMaxs[selectedParam]
+         value = paramMaxs[selectedParam]
+      elseif value < paramMins[selectedParam]
+         value = paramMins[selectedParam]
       end
    end
 
+   if value = origValue then return
 
    sendCommand = PARAMETER_WRITE
    sendLength = 4
@@ -143,6 +152,7 @@ sendParamIncDecPacket:
    transmitBuffer[2]=selectedParam+1
    transmitBuffer[3]=value
 
+   lastChangeTime = gettime()
    gosub sendPacket
    return
 
@@ -162,23 +172,6 @@ checkForPackets:
             if StopUpdate = 0
                params[kTLMintervalParamIdx] = rxBuf[5]-1
                params[kMaxPowerParamIdx] = rxBuf[6]-1
-               if rxBuf[7] = 6
-                  rem -- ISM 2400 band (SX128x)
-                  nValidAirRates = 4
-                  rem -- strtoarray(validAirRates, "\x05\x03\x01\x00")
-                  validAirRates[0] = 5
-                  validAirRates[1] = 3
-                  validAirRates[2] = 1
-                  validAirRates[3] = 0
-               else
-                  rem -- 433/868/915 (SX127x)
-                  nValidAirRates = 4
-                  rem -- strtoarray(validAirRates, "\x06\x05\x04\x02")
-                  validAirRates[0] = 6
-                  validAirRates[1] = 5
-                  validAirRates[2] = 4
-                  validAirRates[3] = 2
-               end
                params[kRFfreqParamIdx] = rxBuf[7]-1
                params[kAirRateParamIdx] = rxBuf[4]
             end
@@ -208,7 +201,7 @@ previousParameter:
 return
 
 decrementParameter:
-isSendIncParam = 0;
+isSendIncParam = -1;
 gosub sendParamIncDecPacket
 return
 
@@ -218,7 +211,6 @@ gosub sendParamIncDecPacket
 return
 
 main:
-   time = gettime()
    gosub checkForPackets
 
  	if state = kWaitingForParams 
