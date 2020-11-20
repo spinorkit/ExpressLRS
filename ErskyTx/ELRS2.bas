@@ -23,7 +23,7 @@ if init = 0
    pktsSent = 0
    pktsGood = 0
    elrsPkts = 0
-   kMinCommandInterval = 40
+   kMinCommandInterval10ms = 100
    lastChangeTime = gettime()
 
 
@@ -81,9 +81,10 @@ if init = 0
 
    isSendIncParam = 0
 
-   kStateWaitingForParams = 0
+   kInitializing = 0
    kReceivedParams = 1
-   state = kWaitingForParams
+   kWaitForUpdate = 2
+   state = kInitializing
 
    rem -- purge the crossfire packet fifo
    result = crossfirereceive(count, command, rxBuf)
@@ -115,7 +116,8 @@ sendPingPacket:
    return
 
 sendParamIncDecPacket:
-   if gettime() - lastChangeTime < kMinCommandInterval then return
+   if state # kReceivedParams then return
+   if gettime() - lastChangeTime < kMinCommandInterval10ms then return
 
    origValue = params[selectedParam]
    if selectedParam = kAirRateParamIdx
@@ -152,6 +154,7 @@ sendParamIncDecPacket:
    transmitBuffer[2]=selectedParam+1
    transmitBuffer[3]=value
 
+   state = kWaitForUpdate
    lastChangeTime = gettime()
    gosub sendPacket
    return
@@ -213,7 +216,7 @@ return
 main:
    gosub checkForPackets
 
- 	if state = kWaitingForParams 
+ 	if state = kInitializing 
 		rem -- crossfireTelemetryPush(0x2D, {0xEE, 0xEA, 0x00, 0x00}) -- ping until we get a resp
       gosub sendPingPacket
 	end
