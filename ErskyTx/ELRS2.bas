@@ -79,7 +79,7 @@ if init = 0
 
    selectedParam = 0
 
-   isSendIncParam = 0
+   incDecParam = 0
 
    kInitializing = 0
    kReceivedParams = 1
@@ -117,7 +117,7 @@ sendPingPacket:
 
 sendParamIncDecPacket:
    if state # kReceivedParams then return
-   if gettime() - lastChangeTime < kMinCommandInterval10ms then return
+   rem -- if gettime() - lastChangeTime < kMinCommandInterval10ms then return
 
    origValue = params[selectedParam]
    if selectedParam = kAirRateParamIdx
@@ -128,7 +128,7 @@ sendParamIncDecPacket:
          if validAirRates[i] = AirRateIdx then break
          i += 1
       end
-      i += isSendIncParam
+      i += incDecParam
       if i >= nValidAirRates
          i = nValidAirRates-1
       elseif i < 0
@@ -137,7 +137,7 @@ sendParamIncDecPacket:
       value = validAirRates[i]
    else
       value = params[selectedParam]
-      value += isSendIncParam
+      value += incDecParam
       if value > paramMaxs[selectedParam]
          value = paramMaxs[selectedParam]
       elseif value < paramMins[selectedParam]
@@ -156,6 +156,8 @@ sendParamIncDecPacket:
 
    state = kWaitForUpdate
    lastChangeTime = gettime()
+   elrsPkts += 1
+
    gosub sendPacket
    return
 
@@ -177,6 +179,8 @@ checkForPackets:
                params[kMaxPowerParamIdx] = rxBuf[6]-1
                params[kRFfreqParamIdx] = rxBuf[7]-1
                params[kAirRateParamIdx] = rxBuf[4]
+               state = kReceivedParams
+               rem -- elrsPkts += 1
             end
 
 				UartBadPkts = rxBuf[8]
@@ -185,8 +189,6 @@ checkForPackets:
          elseif ((rxBuf[2] = 0xFE) & (count = 9))
             rem -- First half of commit sha
          end
-         state = kReceivedParams
-         elrsPkts += 1
       end
 
       result = crossfirereceive(count, command, rxBuf)
@@ -204,12 +206,12 @@ previousParameter:
 return
 
 decrementParameter:
-isSendIncParam = -1;
+incDecParam = -1;
 gosub sendParamIncDecPacket
 return
 
 incrementParameter:
-isSendIncParam = 1;
+incDecParam = 1;
 gosub sendParamIncDecPacket
 return
 
