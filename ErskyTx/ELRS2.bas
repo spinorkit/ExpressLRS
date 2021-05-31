@@ -14,7 +14,9 @@ array params[16]
 array paramMaxs[16]
 array paramMins[16]
 
-array validAirRates[16]
+array validAirRates127[8]
+array validAirRates128[8]
+array validAirRates[8]
 
 if init = 0
    init = 1
@@ -50,15 +52,25 @@ if init = 0
    paramMaxs[kTLMintervalParamIdx] = 7
    paramMins[kMaxPowerParamIdx] = 0
    paramMaxs[kMaxPowerParamIdx] = 7
-   
+
 
    rem -- 433/868/915 (SX127x)
-   nValidAirRates = 4
-   validAirRates[0] = 6
-   validAirRates[1] = 5
-   validAirRates[2] = 4
-   validAirRates[3] = 2
+   kNSX127Rates = 4
+   validAirRates127[0] = 6
+   validAirRates127[1] = 5
+   validAirRates127[2] = 4
+   validAirRates127[3] = 2
 
+   rem -- 2.4 GHz (SX128x)
+   kNSX128Rates = 5
+   validAirRates128[0] = 6
+   validAirRates128[1] = 5
+   validAirRates128[2] = 2
+   validAirRates128[3] = 1
+   validAirRates128[4] = 0
+
+   band24GHz = 0
+   nValidAirRates = kNSX127Rates
 
    i = 0
    while i < kNParams
@@ -124,6 +136,20 @@ sendParamIncDecPacket:
       rem -- find the index of the current value
       AirRateIdx = params[kAirRateParamIdx]
       i = 0
+      if band24GHz = 1
+         nValidAirRates = kNSX128Rates
+         while i < nValidAirRates
+            validAirRates[i] = validAirRates128[i]
+            i += 1
+         end
+      else
+         nValidAirRates = kNSX127Rates
+         while i < nValidAirRates
+            validAirRates[i] = validAirRates127[i]
+            i += 1
+         end
+      end
+      i = 0
       while i < nValidAirRates
          if validAirRates[i] = AirRateIdx then break
          i += 1
@@ -156,7 +182,7 @@ sendParamIncDecPacket:
 
    state = kWaitForUpdate
    lastChangeTime = gettime()
-   elrsPkts += 1
+elrsPkts += 1
 
    gosub sendPacket
    return
@@ -170,15 +196,21 @@ checkForPackets:
       if (command = 0x2D) & (rxBuf[0] = 0xEA) & (rxBuf[1] = 0xEE)
          pktsRead += 1
 
-         if ((rxBuf[2] = 0xFF) & (count = 11))
+         if ((rxBuf[2] = 0xFF) & (count >= 11))
             bindMode = (rxBuf[3] & 1)
             wifiupdatemode = (rxBuf[3] & 2)
 
             if StopUpdate = 0
-               params[kTLMintervalParamIdx] = rxBuf[5]-1
-               params[kMaxPowerParamIdx] = rxBuf[6]-1
-               params[kRFfreqParamIdx] = rxBuf[7]-1
                params[kAirRateParamIdx] = rxBuf[4]
+               params[kTLMintervalParamIdx] = rxBuf[5]
+               params[kMaxPowerParamIdx] = rxBuf[6]
+               params[kRFfreqParamIdx] = rxBuf[7]-1
+
+               band24GHz = 0
+               if rxBuf[7] = 6
+                  band24GHz = 1
+               end
+
                state = kReceivedParams
                rem -- elrsPkts += 1
             end
