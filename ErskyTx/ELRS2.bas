@@ -21,6 +21,31 @@ array validAirRates[8]
 if init = 0
    init = 1
 
+   rem -- try to detect e.g. Taranis style Tx
+   isTaranisStyle = sysflags() & 0x20
+
+   eventLeft = EVT_LEFT_FIRST
+   eventRight = EVT_RIGHT_FIRST
+   eventUp = EVT_UP_FIRST
+   eventDown = EVT_DOWN_FIRST
+
+   eventLeftRept = EVT_LEFT_REPT
+   eventRightRept = EVT_RIGHT_REPT
+   eventUpRept = EVT_UP_REPT
+   eventDownRept = EVT_DOWN_REPT
+
+   if isTaranisStyle # 0
+      eventLeft = EVT_UP_FIRST
+      eventRight = EVT_DOWN_FIRST
+      eventUp = EVT_MENU_BREAK
+      eventDown = EVT_LEFT_FIRST
+
+      eventLeftRept = EVT_UP_REPT
+      eventRightRept = EVT_DOWN_REPT
+      eventUpRept = eventUp
+      eventDownRept = eventDown
+   end
+
    pktsRead = 0
    pktsSent = 0
    pktsGood = 0
@@ -35,7 +60,7 @@ if init = 0
    rem -- list = {AirRate, TLMinterval, MaxPower, RFfreq, Bind, WebServer},
 
 
-   rem -- max param name is 11 = 10 + null
+   rem -- max param name len is 11 = 10 + null
 
    kAirRateParamIdx = 0
    kTLMintervalParamIdx = 1
@@ -54,20 +79,19 @@ if init = 0
    paramMaxs[kMaxPowerParamIdx] = 7
 
 
-   rem -- 433/868/915 (SX127x)
+   rem -- 433/868/915 (SX127x) '25 Hz', '50 Hz', '100 Hz', '200 Hz'
    kNSX127Rates = 4
    validAirRates127[0] = 6
    validAirRates127[1] = 5
    validAirRates127[2] = 4
    validAirRates127[3] = 2
 
-   rem -- 2.4 GHz (SX128x)
-   kNSX128Rates = 5
+   rem -- 2.4 GHz (SX128x) '50 Hz', '150 Hz', '250 Hz'
+   kNSX128Rates = 4
    validAirRates128[0] = 6
    validAirRates128[1] = 5
-   validAirRates128[2] = 2
+   validAirRates128[2] = 3
    validAirRates128[3] = 1
-   validAirRates128[4] = 0
 
    band24GHz = 0
    nValidAirRates = kNSX127Rates
@@ -255,13 +279,13 @@ main:
       gosub sendPingPacket
 	end
 
-   if (Event = EVT_DOWN_FIRST) | (Event = EVT_DOWN_REPT)
+   if (Event = eventDown) | (Event = eventDownRept)
       gosub nextParameter
-   elseif (Event = EVT_UP_FIRST) | (Event = EVT_UP_REPT)
+   elseif (Event = eventUp) | (Event = eventUpRept)
       gosub previousParameter
-   elseif (Event = EVT_LEFT_FIRST) | (Event = EVT_LEFT_REPT)
+   elseif (Event = eventLeft) | (Event = eventLeftRept)
       gosub decrementParameter
-   elseif (Event = EVT_RIGHT_FIRST) | (Event = EVT_RIGHT_REPT)
+   elseif (Event = eventRight) | (Event = eventRightRept)
       gosub incrementParameter
    end
 
