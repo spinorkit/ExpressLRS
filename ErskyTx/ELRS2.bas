@@ -34,6 +34,8 @@ if init = 0
    eventUpRept = EVT_UP_REPT
    eventDownRept = EVT_DOWN_REPT
 
+   activateBtn = EVT_MENU_BREAK
+
    if isTaranisStyle # 0
       eventLeft = EVT_UP_FIRST
       eventRight = EVT_DOWN_FIRST
@@ -44,6 +46,8 @@ if init = 0
       eventRightRept = EVT_DOWN_REPT
       eventUpRept = eventUp
       eventDownRept = eventDown
+
+      activateBtn = EVT_BTN_BREAK
    end
 
    pktsRead = 0
@@ -66,7 +70,8 @@ if init = 0
    kTLMintervalParamIdx = 1
    kMaxPowerParamIdx = 2
    kRFfreqParamIdx = 3
-   kNParams = 4
+   kWifiUpdateParamIdx = 4
+   kNParams = 5
 
    kMaxParamNameLen = 11
    strtoarray(paramNames,"Pkt Rate:\0\0TLM Ratio:\0Power:\0\0\0\0\0RF freq:")
@@ -77,6 +82,10 @@ if init = 0
    paramMaxs[kTLMintervalParamIdx] = 7
    paramMins[kMaxPowerParamIdx] = 0
    paramMaxs[kMaxPowerParamIdx] = 7
+   paramMins[kRFfreqParamIdx] = 0
+   paramMaxs[kRFfreqParamIdx] = 0
+   paramMins[kWifiUpdateParamIdx] = 0
+   paramMaxs[kWifiUpdateParamIdx] = 1
 
 
    rem -- 433/868/915 (SX127x) '25 Hz', '50 Hz', '100 Hz', '200 Hz'
@@ -86,12 +95,13 @@ if init = 0
    validAirRates127[2] = 4
    validAirRates127[3] = 2
 
-   rem -- 2.4 GHz (SX128x) '50 Hz', '150 Hz', '250 Hz'
-   kNSX128Rates = 4
+   rem -- 2.4 GHz (SX128x) '50 Hz', '150 Hz', '250 Hz', '500 Hz'
+   kNSX128Rates = 5
    validAirRates128[0] = 6
    validAirRates128[1] = 5
    validAirRates128[2] = 3
    validAirRates128[3] = 1
+   validAirRates128[4] = 0
 
    band24GHz = 0
    nValidAirRates = kNSX127Rates
@@ -111,6 +121,7 @@ if init = 0
 
    StopUpdate = 0
 
+   kNTotalParams =  5
    kNumEditParams = 3
 
    selectedParam = 0
@@ -150,6 +161,17 @@ sendPingPacket:
 
    gosub sendPacket
    return
+
+sendWifiUpdatePacket:
+   sendCommand = PARAMETER_WRITE
+   sendLength = 4
+   transmitBuffer[0]=0xEE
+   transmitBuffer[1]=0xEA
+   transmitBuffer[2]=0xFE
+   transmitBuffer[3]=0x01
+   gosub sendPacket
+   return
+
 
 sendParamIncDecPacket:
    if state # kReceivedParams then return
@@ -253,12 +275,14 @@ checkForPackets:
 
 nextParameter:
    selectedParam += 1
-   if selectedParam >= kNumEditParams then selectedParam = 0 
+   if selectedParam >= kNTotalParams then selectedParam = 0 
+   if selectedParam = kRFfreqParamIdx then selectedParam += 1 
 return
 
 previousParameter:
    selectedParam -= 1
-   if selectedParam < 0 then selectedParam = kNumEditParams - 1
+   if selectedParam < 0 then selectedParam = kNTotalParams - 1
+   if selectedParam = kRFfreqParamIdx then selectedParam -= 1 
 return
 
 decrementParameter:
@@ -287,6 +311,8 @@ main:
       gosub decrementParameter
    elseif (Event = eventRight) | (Event = eventRightRept)
       gosub incrementParameter
+   elseif Event = activateBtn
+      if selectedParam = kWifiUpdateParamIdx then gosub sendWifiUpdatePacket
    end
 
    drawclear()
@@ -294,7 +320,7 @@ main:
    ygap = 10
    yPos = 0
    drawtext(0, yPos, "ELRS", INVERS)
-   if wifiupdatemode = 1
+   if wifiupdatemode = 2
       drawtext(30, yPos, "http://10.0.0.1")
    elseif bindMode = 1
       drawtext(30, yPos, "Bind not needed")
@@ -328,12 +354,18 @@ main:
    idx = params[param]+1
    yPos = (param+1)*ygap
    drawtext(0, yPos, "RF freq:")
-   drawtext(valueXPos,yPos,"------\0 915 AU \0 915 FCC\0 868 EU \0 433 AU \0 433 EU \0 2G4 ISM"[idx*9],(param=selectedParam)*INVERS)
+   drawtext(valueXPos,yPos,"------  \0 915 AU \0 915 FCC\0 868 EU \0 433 AU \0 433 EU \0 2G4 ISM"[idx*9],(param=selectedParam)*INVERS)
 
    param += 1
+   idx = params[param]+1
    yPos = (param+1)*ygap
-   drawtext(0,yPos,"elrsPkts:")
-   drawnumber(valueXPos+15,yPos,elrsPkts)
+   drawtext(0, yPos, "Wifi:")
+   drawtext(valueXPos,yPos,"Update\0Update\0"[idx*7],(param=selectedParam)*INVERS)
+
+rem   param += 1
+rem   yPos = (param+1)*ygap
+rem   drawtext(0,yPos,"elrsPkts:")
+rem   drawnumber(valueXPos+15,yPos,elrsPkts)
 
    stop
 
