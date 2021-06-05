@@ -8,6 +8,8 @@ rem -- https://github.com/AlessandroAU/ExpressLRS/wiki/Inverter-Mod-for-R9M-2018
 
 array byte rxBuf[64]
 array byte transmitBuffer[64]
+array byte commitSha[8]
+array byte intToHex[17]
 
 array byte paramNames[96]
 array params[16]
@@ -20,6 +22,8 @@ array validAirRates[8]
 
 if init = 0
    init = 1
+
+   strtoarray(intToHex,"0123456789abcdef")
 
    rem -- try to detect e.g. Taranis style Tx
    isTaranisStyle = sysflags() & 0x20
@@ -72,6 +76,8 @@ if init = 0
    kRFfreqParamIdx = 3
    kWifiUpdateParamIdx = 4
    kNParams = 5
+
+   strtoarray(commitSha,"??????")
 
    kMaxParamNameLen = 11
    strtoarray(paramNames,"Pkt Rate:\0\0TLM Ratio:\0Power:\0\0\0\0\0RF freq:")
@@ -265,7 +271,15 @@ checkForPackets:
 				UartGoodPkts = rxBuf[9] * 256 + rxBuf[10] 
 
          elseif ((rxBuf[2] = 0xFE) & (count = 9))
-            rem -- First half of commit sha
+            rem -- First half of commit sha - 6 hexadecimal digits
+            i = 0
+            while i < 6
+               j = rxBuf[i+3]
+               if j >= 0 & j < 16
+                  commitSha[i] = intToHex[j]
+               end
+               i += 1
+            end
          end
       end
 
@@ -325,9 +339,12 @@ main:
    elseif bindMode = 1
       drawtext(30, yPos, "Bind not needed")
    else
-      drawnumber(50,yPos, UartBadPkts)
-      drawtext(50, yPos, ":")
-      drawnumber(70,yPos, UartGoodPkts)
+   rem UartBadPkts = 250
+   rem UartGoodPkts = 250
+      drawnumber(86,yPos, UartBadPkts)
+      drawtext(86, yPos, ":")
+      drawnumber(106,yPos, UartGoodPkts)
+      drawtext(28, yPos, commitSha)
    end
    rem if param = selectedParam then attr = INVERS
 
