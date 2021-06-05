@@ -277,6 +277,9 @@ checkForPackets:
                j = rxBuf[i+3]
                if j >= 0 & j < 16
                   commitSha[i] = intToHex[j]
+               else
+                  rem - 63 -> ? 
+                  commitSha[i] = 63
                end
                i += 1
             end
